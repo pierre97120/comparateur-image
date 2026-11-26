@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comparateur d'images</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: #1e1e1e;
+    color: #ddd;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    background: #2b2b2b;
+    border-bottom: 1px solid #111;
+  }
+  button, select {
+    background: #3a3a3a;
+    color: #eee;
+    border: 1px solid #555;
+    border-radius: 5px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button:hover, select:hover { background: #4a4a4a; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.primary:hover { background: #388bfd; }
+  .nav { display: flex; align-items: center; gap: 6px; }
+  #counter { min-width: 80px; text-align: center; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .spacer { flex: 1; }
+  label.chk { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; user-select: none; }
+  #zoomLabel { min-width: 46px; text-align: center; font-size: 13px; }
+  main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  .pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+  .pane.drop {
+    outline: 3px dashed #1f6feb;
+    outline-offset: -6px;
+  }
+  .imgwrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background:
+      repeating-conic-gradient(#242424 0% 25%, #2c2c2c 0% 50%) 0 / 24px 24px;
+    cursor: grab;
+  }
+  .imgwrap.dragging { cursor: grabbing; }
+  .transformer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    will-change: transform;
+  }
+  .transformer img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #888;
+    font-size: 14px;
+    text-align: center;
+    padding: 20px;
+  }
+  .pane footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #2b2b2b;
+    border-top: 1px solid #111;
+    font-size: 13px;
+    min-height: 32px;
+  }
+  .pane footer .fname {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pane footer .missing { color: #e5534b; }
+  #divider { width: 4px; background: #111; flex: none; }
+  .hint {
+    font-size: 12px;
+    color: #999;
+    padding: 4px 12px;
+    background: #232323;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<header>
+  <button class="primary" id="pickL">📁 Dossier gauche…</button>
+  <button class="primary" id="pickR">📁 Dossier droit…</button>
+  <span class="spacer"></span>
+  <div class="nav">
+    <button id="prev" title="Précédente (flèche gauche)">◀</button>
+    <span id="counter">0 / 0</span>
+    <button id="next" title="Suivante (flèche droite)">▶</button>
+  </div>
+  <span class="spacer"></span>
+  <select id="mode" title="Façon d'associer les images des deux dossiers">
+    <option value="name">Par nom de fichier</option>
+    <option value="pos">Par position</option>
+  </select>
+  <label class="chk" title="Appliquer le zoom et le déplacement aux deux vues">
+    <input type="checkbox" id="sync" checked> Vue synchronisée
+  </label>
+  <button id="zoomOut" title="Zoom arrière (−)">−</button>
+  <span id="zoomLabel">100%</span>
+  <button id="zoomIn" title="Zoom avant (+)">+</button>
+  <button id="fit" title="Ajuster à la fenêtre (0)">Ajuster</button>
+</header>
+<main>
+  <section class="pane" id="paneL">
+    <div class="imgwrap" id="wrapL">
+      <div class="transformer" id="tfL"><img id="imgL" alt=""></div>
+      <div class="placeholder" id="phL">Cliquez sur « Dossier gauche… »<br>ou glissez-déposez un dossier ici</div>
+    </div>
+    <footer><span class="fname" id="nameL">—</span></footer>
+  </section>
+  <div id="divider"></div>
+  <section class="pane" id="paneR">
+    <div class="imgwrap" id="wrapR">
+      <div class="transformer" id="tfR"><img id="imgR" alt=""></div>
+      <div class="placeholder" id="phR">Cliquez sur « Dossier droit… »<br>ou glissez-déposez un dossier ici</div>
+    </div>
+    <footer><span class="fname" id="nameR">—</span></footer>
+  </section>
+</main>
+<div class="hint">Flèches ← → : naviguer &nbsp;•&nbsp; Molette : zoom &nbsp;•&nbsp; Glisser : déplacer &nbsp;•&nbsp; + / − : zoom &nbsp;•&nbsp; 0 : ajuster</div>
+
+<script>
+"use strict";
+
+const IMG_RE = /\.(jpe?g|png|gif|bmp|webp|avif|svg)$/i;
+const MIN_ZOOM = 0.05, MAX_ZOOM = 40;
+
+let leftFiles = [], rightFiles = [];
+let leftDirName = "", rightDirName = "";
+let idx = 0;
+let urls = { L: null, R: null };
+
+const viewL = { zoom: 1, ox: 0, oy: 0 };
+const viewR = { zoom: 1, ox: 0, oy: 0 };
+
+const $ = id => document.getElementById(id);
+const els = {
+  pickL: $("pickL"), pickR: $("pickR"),
+  prev: $("prev"), next: $("next"), counter: $("counter"),
+  mode: $("mode"), sync: $("sync"),
+  zoomIn: $("zoomIn"), zoomOut: $("zoomOut"), fit: $("fit"), zoomLabel: $("zoomLabel"),
+  wrapL: $("wrapL"), wrapR: $("wrapR"),
+  tfL: $("tfL"), tfR: $("tfR"),
+  imgL: $("imgL"), imgR: $("imgR"),
+  phL: $("phL"), phR: $("phR"),
+  nameL: $("nameL"), nameR: $("nameR"),
+};
+
+function readFolder(input) {
+  const files = [];
+  for (const f of input.files) {
+    if (IMG_RE.test(f.name)) files.push(f);
+  }
+  files.sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" }));
+  return files;
+}
+
+function rightIndexFor(i) {
+  if (!rightFiles.length) return -1;
+  if (els.mode.value === "pos") return Math.min(i, rightFiles.length - 1);
+  const name = leftFiles[i] ? leftFiles[i].name.toLowerCase() : null;
+  if (name) {
+    const j = rightFiles.findIndex(f => f.name.toLowerCase() === name);
+    if (j !== -1) return j;
+  }
+  return -1;
+}
+
+function setView(pane, partial) {
+  const targets = els.sync.checked ? [viewL, viewR] : [pane === "L" ? viewL : viewR];
+  for (const v of targets) Object.assign(v, partial);
+  renderTransforms();
+}
+
+function renderTransforms() {
+  for (const [side, v] of [["L", viewL], ["R", viewR]]) {
+    els["tf" + side].style.transform =
+      `translate(${v.ox}px, ${v.oy}px) scale(${v.zoom})`;
+  }
+  els.zoomLabel.textContent = Math.round(viewL.zoom * 100) + "%";
+}
+
+function revoke(side) {
+  if (urls[side]) { URL.revokeObjectURL(urls[side]); urls[side] = null; }
+}
+
+function render() {
+  const total = leftFiles.length;
+  if (!total) idx = 0;
+  else idx = Math.max(0, Math.min(idx, total - 1));
+
+  els.counter.textContent = total ? `${idx + 1} / ${total}` : "0 / 0";
+  els.prev.disabled = !total;
+  els.next.disabled = !total;
+
+  const li = total ? idx : -1;
+  const ri = total ? rightIndexFor(idx) : -1;
+
+  // Left pane
+  revoke("L");
+  if (li >= 0) {
+    urls.L = URL.createObjectURL(leftFiles[li]);
+    els.imgL.src = urls.L;
+    els.phL.style.display = "none";
+    els.nameL.textContent = `${leftDirName ? leftDirName + " / " : ""}${leftFiles[li].name}`;
+    els.nameL.classList.remove("missing");
+  } else {
+    els.imgL.removeAttribute("src");
+    els.phL.style.display = "";
+    els.nameL.textContent = leftDirName ? `${leftDirName} — aucune image` : "—";
+  }
+
+  // Right pane
+  revoke("R");
+  if (ri >= 0) {
+    urls.R = URL.createObjectURL(rightFiles[ri]);
+    els.imgR.src = urls.R;
+    els.phR.style.display = "none";
+    const matched = els.mode.value === "name" && leftFiles[li] &&
+      rightFiles[ri].name.toLowerCase() === leftFiles[li].name.toLowerCase();
+    els.nameR.textContent = `${rightDirName ? rightDirName + " / " : ""}${rightFiles[ri].name}`;
+    els.nameR.classList.toggle("missing", !matched);
+  } else {
+    els.imgR.removeAttribute("src");
+    els.phR.style.display = "";
+    els.nameR.textContent = rightDirName
+      ? (rightFiles.length ? `${rightDirName} — pas de correspondance` : `${rightDirName} — aucune image`)
+      : "—";
+    els.nameR.classList.add("missing");
+  }
+  renderTransforms();
+}
+
+function go(delta) {
+  if (!leftFiles.length) return;
+  idx = Math.max(0, Math.min(leftFiles.length - 1, idx + delta));
+  render();
+}
+
+async function pickFolder(side) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.webkitdirectory = true;
+  input.multiple = true;
+  input.addEventListener("change", () => {
+    if (!input.files.length) return;
+    const files = readFolder(input);
+    const first = input.files[0];
+    const rel = first.webkitRelativePath || first.name;
+    const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "dossier";
+    if (side === "L") { leftFiles = files; leftDirName = dir; idx = 0; }
+    else { rightFiles = files; rightDirName = dir; }
+    setView("L", { zoom: 1, ox: 0, oy: 0 });
+    render();
+  });
+  input.click();
+}
+
+function setupDragDrop(side) {
+  const wrap = side === "L" ? els.wrapL : els.wrapR;
+  wrap.addEventListener("dragover", e => { e.preventDefault(); wrap.classList.add("drop"); });
+  wrap.addEventListener("dragleave", () => wrap.classList.remove("drop"));
+  wrap.addEventListener("drop", async e => {
+    e.preventDefault();
+    wrap.classList.remove("drop");
+    const items = [...(e.dataTransfer.items || [])];
+    const entries = [];
+    for (const it of items) {
+      const entry = it.webkitGetAsEntry && it.webkitGetAsEntry();
+      if (entry) entries.push(entry);
+    }
+    if (!entries.length) return;
+    const files = [];
+    let dirName = "dossier";
+    async function walk(entry, depth) {
+      if (entry.isFile) {
+        const f = await new Promise((res, rej) => entry.file(res, rej));
+        if (IMG_RE.test(f.name)) files.push(f);
+      } else if (entry.isDirectory && depth < 6) {
+        if (depth === 0) dirName = entry.name;
+        const reader = entry.createReader();
+        let batch;
+        do {
+          batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+          for (const c of batch) await walk(c, depth + 1);
+        } while (batch.length);
+      }
+    }
+    for (const en of entries) await walk(en, 0);
+    files.sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" }));
+    if (side === "L") { leftFiles = files; leftDirName = dirName; idx = 0; }
+    else { rightFiles = files; rightDirName = dirName; }
+    setView("L", { zoom: 1, ox: 0, oy: 0 });
+    render();
+  });
+}
+
+function zoomStep(factor) {
+  setView("L", { zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewL.zoom * factor)) });
+}
+
+function setupPanZoom(side) {
+  const wrap = side === "L" ? els.wrapL : els.wrapR;
+  let dragging = false, sx = 0, sy = 0, sox = 0, soy = 0;
+
+  wrap.addEventListener("mousedown", e => {
+    dragging = true;
+    wrap.classList.add("dragging");
+    sx = e.clientX; sy = e.clientY;
+    const v = side === "L" ? viewL : viewR;
+    sox = v.ox; soy = v.oy;
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    setView(side, { ox: sox + (e.clientX - sx), oy: soy + (e.clientY - sy) });
+  });
+  window.addEventListener("mouseup", () => {
+    dragging = false;
+    wrap.classList.remove("dragging");
+  });
+
+  wrap.addEventListener("wheel", e => {
+    e.preventDefault();
+    const v = side === "L" ? viewL : viewR;
+    const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+    const nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.zoom * factor));
+    if (nz === v.zoom) return;
+    const rect = wrap.getBoundingClientRect();
+    const cx = e.clientX - rect.left - rect.width / 2;
+    const cy = e.clientY - rect.top - rect.height / 2;
+    setView(side, {
+      zoom: nz,
+      ox: cx - (cx - v.ox) * (nz / v.zoom),
+      oy: cy - (cy - v.oy) * (nz / v.zoom),
+    });
+  }, { passive: false });
+
+  wrap.addEventListener("dblclick", () => setView(side, { zoom: 1, ox: 0, oy: 0 }));
+}
+
+els.pickL.addEventListener("click", () => pickFolder("L"));
+els.pickR.addEventListener("click", () => pickFolder("R"));
+els.prev.addEventListener("click", () => go(-1));
+els.next.addEventListener("click", () => go(1));
+els.mode.addEventListener("change", render);
+els.sync.addEventListener("change", () => setView("L", {}));
+els.zoomIn.addEventListener("click", () => zoomStep(1.25));
+els.zoomOut.addEventListener("click", () => zoomStep(1 / 1.25));
+els.fit.addEventListener("click", () => setView("L", { zoom: 1, ox: 0, oy: 0 }));
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+  else if (e.key === "+" || e.key === "=") zoomStep(1.25);
+  else if (e.key === "-") zoomStep(1 / 1.25);
+  else if (e.key === "0") setView("L", { zoom: 1, ox: 0, oy: 0 });
+});
+
+setupPanZoom("L");
+setupPanZoom("R");
+setupDragDrop("L");
+setupDragDrop("R");
+render();
+</script>
+</body>
+</html>
