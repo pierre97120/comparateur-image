@@ -101,6 +101,8 @@
     min-height: 28px;
   }
   .fnamebar .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fnamebar .meta { flex: none; display: flex; gap: 6px; color: #aaa; font-size: 12px; white-space: nowrap; }
+  .fnamebar .meta .sep::before { content: "•"; color: #666; }
   .stripbar {
     display: flex;
     align-items: center;
@@ -185,7 +187,7 @@
       <div class="transformer" id="tfL"><img id="imgL" alt=""></div>
       <div class="placeholder" id="phL">Cliquez sur « Dossier gauche… »<br>ou glissez-déposez un dossier ici</div>
     </div>
-    <div class="fnamebar"><span class="fname" id="nameL">—</span></div>
+    <div class="fnamebar"><span class="fname" id="nameL">—</span><span class="meta"><span id="dateL"></span><span class="sep"></span><span id="sizeL"></span></span></div>
     <div class="stripbar"><span class="dirname" id="dirL">Aucun dossier</span><span class="cnt" id="cntL">0 image</span></div>
     <div class="strip" id="stripL"><span class="empty">—</span></div>
   </section>
@@ -195,7 +197,7 @@
       <div class="transformer" id="tfR"><img id="imgR" alt=""></div>
       <div class="placeholder" id="phR">Cliquez sur « Dossier droit… »<br>ou glissez-déposez un dossier ici</div>
     </div>
-    <div class="fnamebar"><span class="fname" id="nameR">—</span></div>
+    <div class="fnamebar"><span class="fname" id="nameR">—</span><span class="meta"><span id="dateR"></span><span class="sep"></span><span id="sizeR"></span></span></div>
     <div class="stripbar"><span class="dirname" id="dirR">Aucun dossier</span><span class="cnt" id="cntR">0 image</span></div>
     <div class="strip" id="stripR"><span class="empty">—</span></div>
   </section>
@@ -226,6 +228,8 @@ const els = {
   imgL: $("imgL"), imgR: $("imgR"),
   phL: $("phL"), phR: $("phR"),
   nameL: $("nameL"), nameR: $("nameR"),
+  dateL: $("dateL"), dateR: $("dateR"),
+  sizeL: $("sizeL"), sizeR: $("sizeR"),
   dirL: $("dirL"), dirR: $("dirR"),
   cntL: $("cntL"), cntR: $("cntR"),
   stripL: $("stripL"), stripR: $("stripR"),
@@ -283,6 +287,21 @@ function selectImage(side, i) {
   if (thumb) thumb.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
+function fmtSize(bytes) {
+  if (!Number.isFinite(bytes)) return "";
+  if (bytes < 1024) return bytes + " o";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1).replace(".", ",") + " Ko";
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1).replace(".", ",") + " Mo";
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2).replace(".", ",") + " Go";
+}
+
+function fmtDate(ms) {
+  if (!ms) return "";
+  const d = new Date(ms);
+  const p = n => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 function renderViewer(side) {
   const f = folders[side];
   const img = els["img" + side];
@@ -290,16 +309,23 @@ function renderViewer(side) {
   const name = els["name" + side];
   const strip = els["strip" + side];
   for (const t of strip.children) t.classList.remove("sel");
+  const meta = els["date" + side];
+  const size = els["size" + side];
   if (f.sel >= 0) {
+    const file = f.files[f.sel];
     img.src = f.urls[f.sel];
     ph.style.display = "none";
-    name.textContent = `${f.name ? f.name + " / " : ""}${f.files[f.sel].name}`;
+    name.textContent = `${f.name ? f.name + " / " : ""}${file.name}`;
+    meta.textContent = fmtDate(file.lastModified);
+    size.textContent = fmtSize(file.size);
     const thumb = strip.children[f.sel];
     if (thumb) thumb.classList.add("sel");
   } else {
     img.removeAttribute("src");
     ph.style.display = "";
     name.textContent = f.name ? `${f.name} — cliquez sur une miniature ci-dessous` : "—";
+    meta.textContent = "";
+    size.textContent = "";
   }
 }
 
