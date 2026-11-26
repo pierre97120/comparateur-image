@@ -24,7 +24,7 @@
     background: #2b2b2b;
     border-bottom: 1px solid #111;
   }
-  button, select {
+  button {
     background: #3a3a3a;
     color: #eee;
     border: 1px solid #555;
@@ -33,12 +33,9 @@
     font-size: 13px;
     cursor: pointer;
   }
-  button:hover, select:hover { background: #4a4a4a; }
-  button:disabled { opacity: .4; cursor: default; }
+  button:hover { background: #4a4a4a; }
   button.primary { background: #1f6feb; border-color: #1f6feb; }
   button.primary:hover { background: #388bfd; }
-  .nav { display: flex; align-items: center; gap: 6px; }
-  #counter { min-width: 80px; text-align: center; font-variant-numeric: tabular-nums; font-size: 14px; }
   .spacer { flex: 1; }
   label.chk { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; user-select: none; }
   #zoomLabel { min-width: 46px; text-align: center; font-size: 13px; }
@@ -54,14 +51,12 @@
     min-width: 0;
     min-height: 0;
   }
-  .pane.drop {
-    outline: 3px dashed #1f6feb;
-    outline-offset: -6px;
-  }
+  .pane.drop { outline: 3px dashed #1f6feb; outline-offset: -6px; }
   .imgwrap {
     flex: 1;
     position: relative;
     overflow: hidden;
+    min-height: 0;
     background:
       repeating-conic-gradient(#242424 0% 25%, #2c2c2c 0% 50%) 0 / 24px 24px;
     cursor: grab;
@@ -95,29 +90,78 @@
     text-align: center;
     padding: 20px;
   }
-  .pane footer {
+  .fnamebar {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
+    padding: 4px 12px;
     background: #2b2b2b;
     border-top: 1px solid #111;
     font-size: 13px;
-    min-height: 32px;
+    min-height: 28px;
   }
-  .pane footer .fname {
-    flex: 1;
+  .fnamebar .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stripbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: #262626;
+    border-top: 1px solid #111;
+    font-size: 12px;
+    color: #aaa;
+    min-height: 26px;
+  }
+  .stripbar .dirname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stripbar .cnt { font-variant-numeric: tabular-nums; }
+  .strip {
+    height: 104px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+    gap: 4px;
+    padding: 5px 8px;
+    background: #232323;
+    border-top: 1px solid #111;
+    align-items: center;
+  }
+  .strip .empty { color: #777; font-size: 12px; padding: 0 8px; }
+  .thumb {
+    flex: none;
+    height: 88px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #191919;
+    display: flex;
+    flex-direction: column;
+  }
+  .thumb:hover { border-color: #666; }
+  .thumb.sel { border-color: #1f6feb; }
+  .thumb img {
+    height: 66px;
+    width: 96px;
+    object-fit: contain;
+    background: #191919;
+    pointer-events: none;
+  }
+  .thumb figcaption {
+    font-size: 10px;
+    line-height: 16px;
+    padding: 0 4px;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    color: #bbb;
   }
-  .pane footer .missing { color: #e5534b; }
+  .thumb.sel figcaption { color: #fff; }
   #divider { width: 4px; background: #111; flex: none; }
   .hint {
     font-size: 12px;
     color: #999;
     padding: 4px 12px;
-    background: #232323;
+    background: #1b1b1b;
     text-align: center;
   }
 </style>
@@ -127,16 +171,6 @@
   <button class="primary" id="pickL">📁 Dossier gauche…</button>
   <button class="primary" id="pickR">📁 Dossier droit…</button>
   <span class="spacer"></span>
-  <div class="nav">
-    <button id="prev" title="Précédente (flèche gauche)">◀</button>
-    <span id="counter">0 / 0</span>
-    <button id="next" title="Suivante (flèche droite)">▶</button>
-  </div>
-  <span class="spacer"></span>
-  <select id="mode" title="Façon d'associer les images des deux dossiers">
-    <option value="name">Par nom de fichier</option>
-    <option value="pos">Par position</option>
-  </select>
   <label class="chk" title="Appliquer le zoom et le déplacement aux deux vues">
     <input type="checkbox" id="sync" checked> Vue synchronisée
   </label>
@@ -151,7 +185,9 @@
       <div class="transformer" id="tfL"><img id="imgL" alt=""></div>
       <div class="placeholder" id="phL">Cliquez sur « Dossier gauche… »<br>ou glissez-déposez un dossier ici</div>
     </div>
-    <footer><span class="fname" id="nameL">—</span></footer>
+    <div class="fnamebar"><span class="fname" id="nameL">—</span></div>
+    <div class="stripbar"><span class="dirname" id="dirL">Aucun dossier</span><span class="cnt" id="cntL">0 image</span></div>
+    <div class="strip" id="stripL"><span class="empty">—</span></div>
   </section>
   <div id="divider"></div>
   <section class="pane" id="paneR">
@@ -159,10 +195,12 @@
       <div class="transformer" id="tfR"><img id="imgR" alt=""></div>
       <div class="placeholder" id="phR">Cliquez sur « Dossier droit… »<br>ou glissez-déposez un dossier ici</div>
     </div>
-    <footer><span class="fname" id="nameR">—</span></footer>
+    <div class="fnamebar"><span class="fname" id="nameR">—</span></div>
+    <div class="stripbar"><span class="dirname" id="dirR">Aucun dossier</span><span class="cnt" id="cntR">0 image</span></div>
+    <div class="strip" id="stripR"><span class="empty">—</span></div>
   </section>
 </main>
-<div class="hint">Flèches ← → : naviguer &nbsp;•&nbsp; Molette : zoom &nbsp;•&nbsp; Glisser : déplacer &nbsp;•&nbsp; + / − : zoom &nbsp;•&nbsp; 0 : ajuster</div>
+<div class="hint">Cliquez sur une miniature pour l'afficher (à vous de faire la correspondance) &nbsp;•&nbsp; Flèches ← → : avancer les deux vues &nbsp;•&nbsp; Maj + flèches : vue gauche seule &nbsp;•&nbsp; Ctrl + flèches : vue droite seule &nbsp;•&nbsp; Molette : zoom &nbsp;•&nbsp; Glisser : déplacer &nbsp;•&nbsp; 0 : ajuster</div>
 
 <script>
 "use strict";
@@ -170,10 +208,10 @@
 const IMG_RE = /\.(jpe?g|png|gif|bmp|webp|avif|svg)$/i;
 const MIN_ZOOM = 0.05, MAX_ZOOM = 40;
 
-let leftFiles = [], rightFiles = [];
-let leftDirName = "", rightDirName = "";
-let idx = 0;
-let urls = { L: null, R: null };
+const folders = {
+  L: { files: [], urls: [], name: "", sel: -1 },
+  R: { files: [], urls: [], name: "", sel: -1 },
+};
 
 const viewL = { zoom: 1, ox: 0, oy: 0 };
 const viewR = { zoom: 1, ox: 0, oy: 0 };
@@ -181,38 +219,98 @@ const viewR = { zoom: 1, ox: 0, oy: 0 };
 const $ = id => document.getElementById(id);
 const els = {
   pickL: $("pickL"), pickR: $("pickR"),
-  prev: $("prev"), next: $("next"), counter: $("counter"),
-  mode: $("mode"), sync: $("sync"),
+  sync: $("sync"),
   zoomIn: $("zoomIn"), zoomOut: $("zoomOut"), fit: $("fit"), zoomLabel: $("zoomLabel"),
   wrapL: $("wrapL"), wrapR: $("wrapR"),
   tfL: $("tfL"), tfR: $("tfR"),
   imgL: $("imgL"), imgR: $("imgR"),
   phL: $("phL"), phR: $("phR"),
   nameL: $("nameL"), nameR: $("nameR"),
+  dirL: $("dirL"), dirR: $("dirR"),
+  cntL: $("cntL"), cntR: $("cntR"),
+  stripL: $("stripL"), stripR: $("stripR"),
 };
 
-function readFolder(input) {
-  const files = [];
-  for (const f of input.files) {
-    if (IMG_RE.test(f.name)) files.push(f);
-  }
-  files.sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" }));
-  return files;
+function sortFiles(files) {
+  return files.sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" }));
 }
 
-function rightIndexFor(i) {
-  if (!rightFiles.length) return -1;
-  if (els.mode.value === "pos") return Math.min(i, rightFiles.length - 1);
-  const name = leftFiles[i] ? leftFiles[i].name.toLowerCase() : null;
-  if (name) {
-    const j = rightFiles.findIndex(f => f.name.toLowerCase() === name);
-    if (j !== -1) return j;
-  }
-  return -1;
+function loadFolder(side, files, dirName) {
+  const f = folders[side];
+  for (const u of f.urls) URL.revokeObjectURL(u);
+  f.files = sortFiles(files);
+  f.urls = f.files.map(file => URL.createObjectURL(file));
+  f.name = dirName;
+  f.sel = -1;
+  buildStrip(side);
+  setView(side, { zoom: 1, ox: 0, oy: 0 });
+  renderViewer(side);
 }
 
-function setView(pane, partial) {
-  const targets = els.sync.checked ? [viewL, viewR] : [pane === "L" ? viewL : viewR];
+function buildStrip(side) {
+  const f = folders[side];
+  const strip = els["strip" + side];
+  strip.innerHTML = "";
+  if (!f.files.length) {
+    strip.innerHTML = `<span class="empty">${f.name ? "Aucune image dans ce dossier" : "—"}</span>`;
+  }
+  f.files.forEach((file, i) => {
+    const fig = document.createElement("figure");
+    fig.className = "thumb";
+    fig.title = file.name;
+    const img = document.createElement("img");
+    img.src = f.urls[i];
+    img.loading = "lazy";
+    img.alt = file.name;
+    const cap = document.createElement("figcaption");
+    cap.textContent = file.name;
+    fig.appendChild(img);
+    fig.appendChild(cap);
+    fig.addEventListener("click", () => selectImage(side, i));
+    strip.appendChild(fig);
+  });
+  els["dir" + side].textContent = f.name || "Aucun dossier";
+  els["cnt" + side].textContent = `${f.files.length} image${f.files.length > 1 ? "s" : ""}`;
+}
+
+function selectImage(side, i) {
+  const f = folders[side];
+  if (!f.files.length) return;
+  f.sel = Math.max(0, Math.min(f.files.length - 1, i));
+  renderViewer(side);
+  setView(side, { zoom: 1, ox: 0, oy: 0 });
+  const thumb = els["strip" + side].children[f.sel];
+  if (thumb) thumb.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function renderViewer(side) {
+  const f = folders[side];
+  const img = els["img" + side];
+  const ph = els["ph" + side];
+  const name = els["name" + side];
+  const strip = els["strip" + side];
+  for (const t of strip.children) t.classList.remove("sel");
+  if (f.sel >= 0) {
+    img.src = f.urls[f.sel];
+    ph.style.display = "none";
+    name.textContent = `${f.name ? f.name + " / " : ""}${f.files[f.sel].name}`;
+    const thumb = strip.children[f.sel];
+    if (thumb) thumb.classList.add("sel");
+  } else {
+    img.removeAttribute("src");
+    ph.style.display = "";
+    name.textContent = f.name ? `${f.name} — cliquez sur une miniature ci-dessous` : "—";
+  }
+}
+
+function step(side, delta) {
+  const f = folders[side];
+  if (!f.files.length) return;
+  selectImage(side, (f.sel < 0 ? (delta > 0 ? -1 : 0) : f.sel) + delta);
+}
+
+function setView(side, partial) {
+  const targets = els.sync.checked ? [viewL, viewR] : [side === "L" ? viewL : viewR];
   for (const v of targets) Object.assign(v, partial);
   renderTransforms();
 }
@@ -225,61 +323,8 @@ function renderTransforms() {
   els.zoomLabel.textContent = Math.round(viewL.zoom * 100) + "%";
 }
 
-function revoke(side) {
-  if (urls[side]) { URL.revokeObjectURL(urls[side]); urls[side] = null; }
-}
-
-function render() {
-  const total = leftFiles.length;
-  if (!total) idx = 0;
-  else idx = Math.max(0, Math.min(idx, total - 1));
-
-  els.counter.textContent = total ? `${idx + 1} / ${total}` : "0 / 0";
-  els.prev.disabled = !total;
-  els.next.disabled = !total;
-
-  const li = total ? idx : -1;
-  const ri = total ? rightIndexFor(idx) : -1;
-
-  // Left pane
-  revoke("L");
-  if (li >= 0) {
-    urls.L = URL.createObjectURL(leftFiles[li]);
-    els.imgL.src = urls.L;
-    els.phL.style.display = "none";
-    els.nameL.textContent = `${leftDirName ? leftDirName + " / " : ""}${leftFiles[li].name}`;
-    els.nameL.classList.remove("missing");
-  } else {
-    els.imgL.removeAttribute("src");
-    els.phL.style.display = "";
-    els.nameL.textContent = leftDirName ? `${leftDirName} — aucune image` : "—";
-  }
-
-  // Right pane
-  revoke("R");
-  if (ri >= 0) {
-    urls.R = URL.createObjectURL(rightFiles[ri]);
-    els.imgR.src = urls.R;
-    els.phR.style.display = "none";
-    const matched = els.mode.value === "name" && leftFiles[li] &&
-      rightFiles[ri].name.toLowerCase() === leftFiles[li].name.toLowerCase();
-    els.nameR.textContent = `${rightDirName ? rightDirName + " / " : ""}${rightFiles[ri].name}`;
-    els.nameR.classList.toggle("missing", !matched);
-  } else {
-    els.imgR.removeAttribute("src");
-    els.phR.style.display = "";
-    els.nameR.textContent = rightDirName
-      ? (rightFiles.length ? `${rightDirName} — pas de correspondance` : `${rightDirName} — aucune image`)
-      : "—";
-    els.nameR.classList.add("missing");
-  }
-  renderTransforms();
-}
-
-function go(delta) {
-  if (!leftFiles.length) return;
-  idx = Math.max(0, Math.min(leftFiles.length - 1, idx + delta));
-  render();
+function zoomStep(factor) {
+  setView("L", { zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewL.zoom * factor)) });
 }
 
 async function pickFolder(side) {
@@ -289,20 +334,17 @@ async function pickFolder(side) {
   input.multiple = true;
   input.addEventListener("change", () => {
     if (!input.files.length) return;
-    const files = readFolder(input);
+    const files = [...input.files].filter(f => IMG_RE.test(f.name));
     const first = input.files[0];
     const rel = first.webkitRelativePath || first.name;
     const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "dossier";
-    if (side === "L") { leftFiles = files; leftDirName = dir; idx = 0; }
-    else { rightFiles = files; rightDirName = dir; }
-    setView("L", { zoom: 1, ox: 0, oy: 0 });
-    render();
+    loadFolder(side, files, dir);
   });
   input.click();
 }
 
 function setupDragDrop(side) {
-  const wrap = side === "L" ? els.wrapL : els.wrapR;
+  const wrap = els["wrap" + side];
   wrap.addEventListener("dragover", e => { e.preventDefault(); wrap.classList.add("drop"); });
   wrap.addEventListener("dragleave", () => wrap.classList.remove("drop"));
   wrap.addEventListener("drop", async e => {
@@ -332,20 +374,12 @@ function setupDragDrop(side) {
       }
     }
     for (const en of entries) await walk(en, 0);
-    files.sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true, sensitivity: "base" }));
-    if (side === "L") { leftFiles = files; leftDirName = dirName; idx = 0; }
-    else { rightFiles = files; rightDirName = dirName; }
-    setView("L", { zoom: 1, ox: 0, oy: 0 });
-    render();
+    loadFolder(side, files, dirName);
   });
 }
 
-function zoomStep(factor) {
-  setView("L", { zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewL.zoom * factor)) });
-}
-
 function setupPanZoom(side) {
-  const wrap = side === "L" ? els.wrapL : els.wrapR;
+  const wrap = els["wrap" + side];
   let dragging = false, sx = 0, sy = 0, sox = 0, soy = 0;
 
   wrap.addEventListener("mousedown", e => {
@@ -386,9 +420,6 @@ function setupPanZoom(side) {
 
 els.pickL.addEventListener("click", () => pickFolder("L"));
 els.pickR.addEventListener("click", () => pickFolder("R"));
-els.prev.addEventListener("click", () => go(-1));
-els.next.addEventListener("click", () => go(1));
-els.mode.addEventListener("change", render);
 els.sync.addEventListener("change", () => setView("L", {}));
 els.zoomIn.addEventListener("click", () => zoomStep(1.25));
 els.zoomOut.addEventListener("click", () => zoomStep(1 / 1.25));
@@ -396,9 +427,17 @@ els.fit.addEventListener("click", () => setView("L", { zoom: 1, ox: 0, oy: 0 }))
 
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
-  if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
-  else if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
-  else if (e.key === "+" || e.key === "=") zoomStep(1.25);
+  if (e.key === "ArrowRight") {
+    e.preventDefault();
+    if (e.shiftKey) step("L", 1);
+    else if (e.ctrlKey || e.altKey) step("R", 1);
+    else { step("L", 1); step("R", 1); }
+  } else if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    if (e.shiftKey) step("L", -1);
+    else if (e.ctrlKey || e.altKey) step("R", -1);
+    else { step("L", -1); step("R", -1); }
+  } else if (e.key === "+" || e.key === "=") zoomStep(1.25);
   else if (e.key === "-") zoomStep(1 / 1.25);
   else if (e.key === "0") setView("L", { zoom: 1, ox: 0, oy: 0 });
 });
@@ -407,7 +446,7 @@ setupPanZoom("L");
 setupPanZoom("R");
 setupDragDrop("L");
 setupDragDrop("R");
-render();
+renderTransforms();
 </script>
 </body>
 </html>
